@@ -11,6 +11,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AuthServer.Core.Configuration;
+using SharedLibrary.Configurations;
 
 namespace IdentityAuthServer.API
 {
@@ -26,6 +28,9 @@ namespace IdentityAuthServer.API
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+
+            services.Configure<CustomTokenOption>(Configuration.GetSection("TokenOption"));
+            services.Configure<List<Client>>(Configuration.GetSection("Clients"));
 
             services.AddControllers();
             services.AddSwaggerGen(c =>
