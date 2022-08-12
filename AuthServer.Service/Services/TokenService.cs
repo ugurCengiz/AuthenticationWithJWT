@@ -14,10 +14,11 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using SharedLibrary.Configurations;
+using SharedLibrary.Services;
 
 namespace AuthServer.Service.Services
 {
-    class TokenService : ITokenService
+   public class TokenService : ITokenService
     {
 
         private readonly UserManager<UserApp> _userManager;

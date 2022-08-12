@@ -9,22 +9,30 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AuthServer.Data.Repositories
 {
-    public class GenericRepository<Tentity>:IGenericRepository<Tentity> where Tentity:class
+    public class GenericRepository<TEntity>:IGenericRepository<TEntity> where TEntity : class
     {
         private readonly DbContext _context;
-        private readonly DbSet<Tentity> _dbSet;
-
-        public GenericRepository(AppDbContext context)
+        private readonly DbSet<TEntity> _dbSet;
+        public GenericRepository(AppDbContext appDbContext)
         {
-            _context = context;
-            _dbSet = context.Set<Tentity>();
+            _context = appDbContext;
+            _dbSet = appDbContext.Set<TEntity>();
         }
 
-        public async Task<Tentity> GetByIdAsync(int id)
+        public async Task AddAsync(TEntity entity)
+        {
+            await _dbSet.AddAsync(entity);
+        }
+
+        public async Task<IEnumerable<TEntity>> GetAllAsync()
+        {
+            return await _dbSet.ToListAsync();
+        }
+
+        public async Task<TEntity> GetByIdAsync(int id)
         {
             var entity = await _dbSet.FindAsync(id);
-
-            if (entity!=null)
+            if (entity != null)
             {
                 _context.Entry(entity).State = EntityState.Detached;
             }
@@ -32,30 +40,21 @@ namespace AuthServer.Data.Repositories
             return entity;
         }
 
-        public async Task<IEnumerable<Tentity>> GetAllAsync()
-        {
-            return await _dbSet.ToListAsync();
-        }
-
-        public IQueryable<Tentity> Where(Expression<Func<Tentity, bool>> predicate)
-        {
-            return _dbSet.Where(predicate);
-        }
-
-        public async Task AddAsync(Tentity entity)
-        {
-           await _dbSet.AddAsync(entity);
-        }
-
-        public void Remove(Tentity entity)
+        public void Remove(TEntity entity)
         {
             _dbSet.Remove(entity);
         }
 
-        public Tentity Update(Tentity entity)
+        public TEntity UpdateAsync(TEntity entity)
         {
             _context.Entry(entity).State = EntityState.Modified;
+
             return entity;
+        }
+
+        public IQueryable<TEntity> Where(Expression<Func<TEntity, bool>> filter)
+        {
+            return _dbSet.Where(filter);
         }
     }
 }

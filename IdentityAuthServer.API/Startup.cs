@@ -12,7 +12,21 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AuthServer.Core.Configuration;
+using AuthServer.Core.Models;
+using AuthServer.Core.Repositories;
+using AuthServer.Core.Services;
+using AuthServer.Core.UnitOfWork;
+using AuthServer.Data;
+using AuthServer.Data.Repositories;
+using AuthServer.Service.Services;
+using FluentValidation.AspNetCore;
+using IdentityAuthServer.API.Exceptions;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using SharedLibrary.Configurations;
+using SharedLibrary.Extensions;
+using SharedLibrary.Services;
 
 namespace IdentityAuthServer.API
 {
@@ -25,14 +39,69 @@ namespace IdentityAuthServer.API
 
         public IConfiguration Configuration { get; }
 
-        // This method gets called by the runtime. Use this method to add services to the container.
+       
         public void ConfigureServices(IServiceCollection services)
         {
+            // DI Register
+            services.AddScoped<IAuthenticationService, AuthenticationService>();
+            services.AddScoped<IUserService, UserService>();
+            services.AddScoped<ITokenService, TokenService>();
+            services.AddScoped(typeof(IGenericRepository<>),typeof(GenericRepository<>));
+            services.AddScoped(typeof(IServiceGeneric<,>), typeof(ServiceGeneric<,>));
+
+            services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+            services.AddDbContext<AppDbContext>(options =>
+            {
+                options.UseSqlServer(Configuration.GetConnectionString("SqlServer"), sqlOptions =>
+                {
+                    sqlOptions.MigrationsAssembly("AuthServer.Data");
+                });
+            });
+
+
+            services.AddIdentity<UserApp, IdentityRole>(Opt =>
+            {
+                Opt.User.RequireUniqueEmail = true;
+                Opt.Password.RequireNonAlphanumeric = false;
+            }).AddEntityFrameworkStores<AppDbContext>().AddDefaultTokenProviders();
 
             services.Configure<CustomTokenOption>(Configuration.GetSection("TokenOption"));
+
+           
+
             services.Configure<List<Client>>(Configuration.GetSection("Clients"));
 
-            services.AddControllers();
+            services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            }).AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, opt =>
+            {
+                var tokenOptions = Configuration.GetSection("TokenOption").Get<CustomTokenOption>();
+                opt.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters()
+                {
+                    ValidIssuer =  tokenOptions.Issuer,
+                    ValidAudience = tokenOptions.Audience[0],
+                    IssuerSigningKey = SignService.GetSymmetricSecurityKey(tokenOptions.SecurityKey),
+                    
+                    ValidateIssuerSigningKey = true,
+                    ValidateAudience = true,
+                    ValidateIssuer = true,
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.Zero
+                    
+                };
+            });
+
+        
+
+
+            services.AddControllers().AddFluentValidation(options =>
+            {
+                options.RegisterValidatorsFromAssemblyContaining<Startup>();
+            });
+            services.UserCustomValidationResponse();
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "IdentityAuthServer.API", Version = "v1" });
@@ -48,10 +117,14 @@ namespace IdentityAuthServer.API
                 app.UseSwagger();
                 app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "IdentityAuthServer.API v1"));
             }
-
+            else
+            {
+            }
+            app.UseCustomException();
             app.UseHttpsRedirection();
 
             app.UseRouting();
+            app.UseAuthentication();
 
             app.UseAuthorization();
 
